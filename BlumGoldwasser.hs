@@ -1,49 +1,35 @@
+{-# LANGUAGE ViewPatterns #-}
+
 import Data.Bits (testBit, xor)
-
-toBoolList :: String -> [Bool]
-toBoolList = map (=='1')
-
-fromBoolList :: [Bool] -> String
-fromBoolList = map $ \x -> if x then '1' else '0'
+import MathFunctions
+import Text.Printf (printf)
 
 p = 499
 q = 547
+a = -57
+b = 52
 n = p*q
-m = "10011100000100001100"
-x0 = 159201
 
-modularPow :: (Integral a, Integral b) => a -> b -> a -> a
-modularPow _ 0 _ = 1
-modularPow b e m = if odd e then mult result b else result
-	where
-		result = modularPow (mult b b) (e `div` 2) m
-		mult x y = (x*y) `mod` m
-
-blumGoldwasserEncryption :: [Bool] -> Integer -> ([Bool], Integer)
-blumGoldwasserEncryption m x0 = (c, keyStream !! (length m - 1))
+encrypt :: String -> Integer -> (String, Integer)
+encrypt (toBoolList -> m) x0 = (fromBoolList c, keyStream !! (length m))
 	where
 		keyStream = bbs x0
 		c = zipWith xor m $ map (`testBit` 0) keyStream
 
-blumGoldwasserDecryption :: ([Bool], Integer) -> [Bool]
-blumGoldwasserDecryption (c, y) = zipWith xor c b
+decrypt :: (String, Integer) -> String
+decrypt (toBoolList -> c, y) = fromBoolList $ zipWith xor c x
 	where
-		l = length c - 1
-		b = map (`testBit` 0) $ bbs x0
-		rp = modularPow y (((p+1) `div` 4)^l) p
-		rq = modularPow y (((q+1) `div` 4)^l) q
-		x0 = (q*(modInverse q p)*rp + p*(modInverse p q)*rq) `mod` n
+		t = length c - 1
+		d n = modularPow ((n+1) `div` 4) (t+1) (n-1)
+		u = modularPow y (d p) p
+		v = modularPow y (d q) q
+		x = map (`testBit` 0) $ bbs $ mod (v*a*p + u*b*q) n
 
 bbs :: Integer -> [Integer]
 bbs = iterate ((`mod` n) . (^2))
 
-diffs _ [] = []
-diffs _ (_:[]) = []
-diffs f (x:y:xs) = (f x y) : diffs f (y:xs)
-
-modInverse :: Integral a => a -> a -> a
-modInverse a b = (last $ init s) `mod` b
-	where
-		r = takeWhile (/=0) $ a : b : zipWith (-) r (zipWith (*) q $ tail r)
-		s = 1 : 0 : zipWith (-) s (zipWith (*) q (tail s))
-		q = diffs div r
+main = do
+	let m = "10011100000100001100"
+	let x0 = 159201 :: Integer
+	printf "1. C(%s) = %s\n" m (fst $ encrypt m x0)
+	printf "2. D(C(%s)) = %s\n" m (decrypt $ encrypt m x0)
